@@ -2,21 +2,34 @@
 #include<iostream>
 #include <fstream>
 #include <math.h>
+#include <random>
+#include <cassert>
+
 //Include header
 #include "ShallowNetwork.h"
 
+#define SIZET (sizeof(double))
+
 //constructor
-ShallowNetwork::ShallowNetwork(uint32_t pId, uint32_t pR, uint32_t pC, uint32_t iN, uint32_t hN1, uint32_t hN2, uint32_t oN) : pId(pId), processorsRows(pR), processorsCols(pC), inputNeurons(iN), hiddenNeurons(hN), outputNeurons(oN) {
+ShallowNetwork::ShallowNetwork(uint32_t pId, uint32_t pR, uint32_t pC, uint32_t iN, uint32_t hN, uint32_t oN) : pId(pId), processorsRows(pR), processorsCols(pC), inputNeurons(iN), hiddenNeurons(hN), outputNeurons(oN) {
 
   //total number of processors
   nProcessors = pR * pC;
 
   //determine the local number of neurons
-  localInputNeurons = (iN < 10) ? iN : (iN + nP - pId -1) / nP;
+  localInputNeurons = (iN < 10) ? iN : (iN + nProcessors - pId -1) / nProcessors;  //cyclic distribution
 
-  localHiddenNeurons = (hN < 10) ? hN : (hN + nP - pId -1) / nP;
+  localHiddenNeurons = (hN < 10) ? hN : (hN + nProcessors - pId -1) / nProcessors;  //cyclic distribution
 
-  localOutputNeurons = (oN < 10) ? oN : (oN + nP - pId -1) / nP;
+  //No localOutputNeurons, since output neurons are stored entirely on each processors
+
+  //allocate memory for storing vector elements received during matix-vector multiplication
+  localStore = new double[hiddenNeurons - localHiddenNeurons];
+
+  //allocate memory for storing partial results received from all the processors
+  allResults = new double[localHiddenNeurons * nProcessors];
+
+  allResultsOutput = new double[outputNeurons * nProcessors];
 
   //allocate memory for the layers and initialize them to zero
   hidden = new double[localHiddenNeurons];
@@ -32,12 +45,35 @@ ShallowNetwork::ShallowNetwork(uint32_t pId, uint32_t pR, uint32_t pC, uint32_t 
     output[i] = 0;
   }
 
-  //initialize biases vectors and weights matrices
+  //initialize biases vectors, weights matrices and related quantities
   initializeWeightsAndBiases();
 }
 
+//destructor
+ShallowNetwork::~ShallowNetwork()
+{
+	//delete neurons
+	delete[] hidden;
+	delete[] output;
+
+  //delete weight and biases
+  delete[] weightInputHidden;
+  delete[] weightHiddenOutput;
+	delete[] hiddenBias;
+  delete[] outputBias;
+
+  //delete storing arrays
+  delete[] matrixIndecesIH;
+  delete[] localStore;
+  delete[] partialResults;
+  delete[] allResults;
+  delete[] partialResultsOutput;
+  delete[] allResultsOutput;
+}
+
+
 //biases initializer
-void ShallowNetwork::initializeWeightAndBiases() {
+void ShallowNetwork::initializeWeightsAndBiases() {
 
   //set the seed to a random value
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -65,7 +101,7 @@ void ShallowNetwork::initializeWeightAndBiases() {
 
   //Store matrix indices of elements in the processor for the weight of the Input-Hidden layer.
   //The row index and column index of an element are store contiguosly
-  matrixIndecesIH = new uint32_t[2 * std::ceil(inputNeurons) / nProcessors * std::ceil(hiddenNeurons) / nProcessors];
+  matrixIndecesIH = new uint32_t[2 * (uint32_t)std::ceil(inputNeurons * 1.0 / nProcessors) * (uint32_t)std::ceil(hiddenNeurons * 1.0 / nProcessors)];
 
   //keep trak of how many matrix elements are assigned to the processor (for the Input-Hidden matrix)
   countElements = 0;
@@ -80,6 +116,20 @@ void ShallowNetwork::initializeWeightAndBiases() {
       }
     }
   }
+
+  //count number of row elements (Js) and column elements (Is)
+  uint32_t currentI = matrixIndecesIH[0];
+  for (uint32_t i = 0; i < countElements; ++i) {
+    if (currentI != matrixIndecesIH[i]) { break; }
+    ++countJ;
+  }
+  countI = countElements / countJ;
+  assert(countElements % countJ == 0);
+
+  //allocate memory for storing partial results of the matrix-vector computations
+  partialResults = new double[countI];
+
+  partialResultsOutput = new double[outputNeurons];
 
   //Set weights between input and hidden layers
   //----------------------------------------------------------------------------
@@ -101,18 +151,18 @@ void ShallowNetwork::initializeWeightAndBiases() {
   //For the output layer, do to the small number of output neurons, we use
   //the cylclic column distribution to distribute the matrix elements
 
-  //number of local elements for the cyclic distribution
-  uint32_t localSize = localHiddenNeurons * outputNeurons
+  //number of local elements for the cyclic column distribution
+  uint32_t localSize = localHiddenNeurons * outputNeurons;
 
   //Allocate memory
-  weightHiddenOtput = new double[localHiddenNeurons * outputNeurons];
+  weightHiddenOutput = new double[localHiddenNeurons * outputNeurons];
 
   //Standard deviation of the Gaussian
   stdDev = 1 / (double)sqrt(hiddenNeurons);
 
   //Initialize the weights and rescale them
   for (uint32_t i = 0; i < localSize; ++i) {
-    weightHiddenOtput[i] = distribution(generator) * stdDev;
+    weightHiddenOutput[i] = distribution(generator) * stdDev;
   }
 }
 
@@ -173,12 +223,9 @@ bool ShallowNetwork::loadNetwork(const char * directoryName) {
 */
 
 //Activation function
-void ShallowNetwork::activationFunction(double * input, uint32_t inputSize) {
-
+void ShallowNetwork::activationFunction(double & input) {
   //sigmoid function
-  for (uint32_t i = 0; i < inputSize; ++i) {
-    input[i] = 1.0 / (1.0 + exp(-input[i]));
-  }
+  input = 1.0 / (1.0 + exp(-input));
 }
 
 //Feed Forward procedure
@@ -188,55 +235,97 @@ void ShallowNetwork::feedForward(double * input) {
   //----------------------------------------------------------------------------
 
   //Superstep 0: Fanout
-  uint32_t count;
-  for (uint32_t i = 0; i < countElements; ++i) {
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < countJ; ++i) {
     if ( matrixIndecesIH[i * 2 + 1] % nProcessors != pId) {
       ++count;
+      bsp_get( (matrixIndecesIH[i * 2 + 1] % nProcessors), input + matrixIndecesIH[i * 2 + 1] / nProcessors, 0, localStore + count, SIZET);
     }
-    bsp_get( (matrixIndecesIH[i * 2 + 1] % nProcessors), hidden + matrixIndecesIH[i * 2 + 1] / nProcessors, 0, localStore + count, SIZET);
-  }
+  } //localStore stores the vector elements not owned by the processors in increasing index order
 
-  //local matrix-vector multiplication
-  for (uint32_t i = 0; i < countElements; ++i) {
+  //Superstep 1: local matrix-vector multiplication
+  uint32_t currentI;
+  uint32_t currentJ;
+
+  for (uint32_t i = 0; i < countI; ++i) {
+    count = 0;
+    currentI = matrixIndecesIH[i * countJ * 2];
     partialResults[i] = 0;
-    for (uint32_t i = 0; i < )
+    for (uint32_t j = 0; j < countJ; ++j) {
+      currentJ = matrixIndecesIH[j * 2 + 1];
+      if (currentJ % nProcessors == pId) { //if the corresponding vector element is in the current processor
+        partialResults[i] += weightInputHidden[i * countJ + j] * input[currentJ / nProcessors];
+      }
+      else { //the corresponding vector element was taken from another processor
+        partialResults[i] += weightInputHidden[i * countJ + j] * localStore[count];
+        ++count;
+        assert(count <= countJ);
+      }
+    }
+    //superstep 2: Fanin
+    if (partialResults[i] != 0) {
+      bsp_put(currentI % nProcessors, partialResults + i, (allResults + currentI * nProcessors + pId), 0, SIZET);
+    }
   }
+  bsp_sync();
 
+  //superstep 3: Summation of partial sums
+  for (uint32_t i = 0; i < localHiddenNeurons; ++i) {
+    hidden[i] = 0;
+    currentI = matrixIndecesIH[i * 2];
+    for (uint32_t j = 0; j < nProcessors; ++j) {
+      if (allResults[currentI + j]) {
+        hidden[i] += allResults[currentI + j];
+      }
+    }
+    hidden[i] += hiddenBias[i];
+    activationFunction(hidden[i]);
+  }
 
   //calculate output from hidden layer
   //----------------------------------------------------------------------------
-  for (uint32_t i = 0; i < hiddenNeurons; ++i) {
-    hidded[i] = 0;
-    for (uint32_t j = 0; j < inputNeurons; ++j) {
-      hidden[i] += weightInputHidden[i * input + j] * input[j];
-    }
+  //The hidden-output matrix is stored in a column cyclic fashion
+  //Fanout is not required
 
-    hidden[i] = activationFunction(hidden[i]);
+  //Superstep 0: local matrix-vector multiplication
+  for (uint32_t i = 0; i < localHiddenNeurons; ++i) {
+    for (uint32_t j = 0; j < localOutputNeurons; ++j) {
+      partialResultsOutput[j] += hidden[i] * weightHiddenOutput[i  + j * localHiddenNeurons];
+    }
   }
 
-  //calculate output
-  //----------------------------------------------------------------------------
+  //superstep 1: All-to-all communication. We want to store the output on every processor
   for (uint32_t i = 0; i < outputNeurons; ++i) {
-    output[i] = 0;
-    for (uint32_t j = 0; j < inputNeurons; ++j) {
-      output[i] += weightHiddenOutput[i * input + j] * input[j];
+    for (uint32_t j = 0; j < nProcessors; ++j) {
+      if (partialResultsOutput[i]) {
+        bsp_put(j, partialResultsOutput + i, (allResultsOutput + pId + i * nProcessors), 0, SIZET);
+      }
     }
+  }
+  bsp_sync();
 
-    output[i] = activationFunction(ouput[i]);
+  //superstep 2: Summation of partial results
+  for (uint32_t j = 0; j < outputNeurons; ++j) {
+    output[j] = 0;
+    for (uint32_t i = 0; i < nProcessors; ++i) {
+      output[j] += allResultsOutput[i + j * nProcessors];
+    }
+    output[j] += outputBias[j];
+    activationFunction(output[j]);
   }
 }
 
 //get the output neuron with the highest output value
-uint32_t ShallowNetwork::getResult(float * input) {
+uint32_t ShallowNetwork::getResult(double * input) {
 
   //feedforward input
   ShallowNetwork::feedForward(input);
 
   //find the index of the neuron with the highest output value
   uint32_t indexMax = 0;
-  float currentMax = 0;
+  double currentMax = 0;
   for (uint32_t i = 0; i < outputNeurons; ++i) {
-    if (ouput[i] > currentMax) {
+    if (output[i] > currentMax) {
       currentMax = output[i];
       indexMax = i;
     }
@@ -245,8 +334,9 @@ uint32_t ShallowNetwork::getResult(float * input) {
   return indexMax;
 }
 
+/*
 //accuracy on an input set
-float ShallowNetwork::getAccuracyOfSet(field< field<fvec> > * set) {
+float ShallowNetwork::getAccuracyOfSet(double * set) {
   float incorrectResults = 0;
 
   //compare result of each input with corresponding label
@@ -260,3 +350,4 @@ float ShallowNetwork::getAccuracyOfSet(field< field<fvec> > * set) {
   //return percentage of correct results
   return 100 - (incorrectResults / size * 100);
 }
+*/

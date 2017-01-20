@@ -54,16 +54,14 @@ void parallelNN() {
   //----------------------------------------------------------------------------
   IsingDataLoader training;
 
-  //ratio
-  uint32_t ratio = std::ceil(inputNeurons * 1.0 / hiddenNeurons);
-  uint32_t difference = (inputNeurons > hiddenNeurons) ? inputNeurons - hiddenNeurons : hiddenNeurons - inputNeurons;
-
   //load data on processor 0 and distribute them cyclically to all the other processors
   //----------------------------------------------------------------------------
   if (pid == 0) {
     if ( !training.loadData(setSize, "../Final Project/dataParallel/trainingParallel_00.txt") ) { return; };
 
     double * set = training.getDataSet();
+
+    label = training.getLabels();
 
     //put all the labels in each processor
     for (uint32_t i  = 0; i < nCores; ++i) {

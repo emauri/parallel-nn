@@ -6,14 +6,17 @@
 #include "ShallowNetwork.h"
 
 //constructor
-ShallowNetwork::ShallowNetwork(uint32_t nP, iN, uint32_t hN1, uint32_t hN2, uint32_t oN) : nProcessors(nP), inputNeurons(iN), hiddenNeurons(hN), outputNeurons(oN) {
+ShallowNetwork::ShallowNetwork(uint32_t pId, uint32_t pR, uint32_t pC, uint32_t iN, uint32_t hN1, uint32_t hN2, uint32_t oN) : pId(pId), processorsRows(pR), processorsCols(pC), inputNeurons(iN), hiddenNeurons(hN), outputNeurons(oN) {
+
+  //total number of processors
+  nProcessors = pR * pC;
 
   //determine the local number of neurons
-  localInputNeurons = (iN < 10) ? iN : std::ceil(iN * 1.0 / nP);
+  localInputNeurons = (iN < 10) ? iN : (iN + nP - pId -1) / nP;
 
-  localHiddenNeurons = (hN < 10) ? hN : std::ceil(hN * 1.0 / nP);
+  localHiddenNeurons = (hN < 10) ? hN : (hN + nP - pId -1) / nP;
 
-  localOutputNeurons = (oN < 10) ? oN : std::ceil(oN * 1.0 / nP);
+  localOutputNeurons = (oN < 10) ? oN : (oN + nP - pId -1) / nP;
 
   //allocate memory for the layers and initialize them to zero
   hidden = new double[localHiddenNeurons];
@@ -60,28 +63,49 @@ void ShallowNetwork::initializeWeightAndBiases() {
     outputBias[i] = distribution(generator);
   }
 
+  //Store matrix indices of elements in the processor for the weight of the Input-Hidden layer.
+  //The row index and column index of an element are store contiguosly
+  matrixIndecesIH = new uint32_t[2 * std::ceil(inputNeurons) / nProcessors * std::ceil(hiddenNeurons) / nProcessors];
+
+  //keep trak of how many matrix elements are assigned to the processor (for the Input-Hidden matrix)
+  countElements = 0;
+
+  //initialize matrixIndeces
+  for(uint32_t i = 0; i < inputNeurons; ++i) {
+    for (uint32_t j = 0; j < hiddenNeurons; ++j) {
+      if ( (i % processorsCols) + processorsRows * ((j % nProcessors) / processorsCols) == pId ) {
+        matrixIndecesIH[countElements * 2] = i;
+        matrixIndecesIH[countElements * 2 + 1] = j;
+        ++countElements;
+      }
+    }
+  }
+
   //Set weights between input and hidden layers
   //----------------------------------------------------------------------------
-  uint32_t localSize = std::ceil( std::max(inputNeurons, hiddenNeurons) * std::max(localInputNeurons, localHiddenNeurons) ); // VERIFY THIS
 
   //Allocate memory
-  weightInputHidden = new double[localSize];
+  weightInputHidden = new double[countElements];
 
   //standard deviation of the Gaussian distribution
   float stdDev = 1.0 / (double)sqrt(inputNeurons);
 
   //initialize the weights and rescale them
-  for (uint32_t i = 0; i < localSize; ++i) {
+  for (uint32_t i = 0; i < countElements; ++i) {
     weightInputHidden[i] = distribution(generator) * stdDev;
   }
 
-  //set weights between input and hidden layers
+  //set weights between hidden and output layers.
   //----------------------------------------------------------------------------
-  //CHECK THE MAXIMUM SIZE OF THE MATRX
-  localSize = std::ceil( std::max(outputNeurons, hiddenNeurons) * std::max(localOutputNeurons, localHiddenNeurons) ); // VERIFY THIS
+
+  //For the output layer, do to the small number of output neurons, we use
+  //the cylclic column distribution to distribute the matrix elements
+
+  //number of local elements for the cyclic distribution
+  uint32_t localSize = localHiddenNeurons * outputNeurons
 
   //Allocate memory
-  weightHiddenOtput = new double[localSize];
+  weightHiddenOtput = new double[localHiddenNeurons * outputNeurons];
 
   //Standard deviation of the Gaussian
   stdDev = 1 / (double)sqrt(hiddenNeurons);
@@ -92,6 +116,7 @@ void ShallowNetwork::initializeWeightAndBiases() {
   }
 }
 
+/*
 //Save network configuration
 bool ShallowNetwork::saveNetwork(const char * directoryName) {
 
@@ -134,7 +159,7 @@ bool ShallowNetwork::loadNetwork(const char * directoryName) {
   //load hidden-output weigths matrix
   bool hoWStatus = weightHiddenOutput.load(stringName + "/ho_weights.txt", arma_binary);
 
-  //save biases vectors to .txt file in arma_binary format
+  //load biases vectors to .txt file in arma_binary format
   //----------------------------------------------------------------------------
 
   //load hidden layer biases vector
@@ -145,6 +170,7 @@ bool ShallowNetwork::loadNetwork(const char * directoryName) {
 
   return (hoWStatus && ihWStatus && hBStatus && oBStatus);
 }
+*/
 
 //Activation function
 void ShallowNetwork::activationFunction(double * input, uint32_t inputSize) {
@@ -158,7 +184,25 @@ void ShallowNetwork::activationFunction(double * input, uint32_t inputSize) {
 //Feed Forward procedure
 void ShallowNetwork::feedForward(double * input) {
 
-  assert(M * N = nProcessors);
+  //calculate output from hidden layer
+  //----------------------------------------------------------------------------
+
+  //Superstep 0: Fanout
+  uint32_t count;
+  for (uint32_t i = 0; i < countElements; ++i) {
+    if ( matrixIndecesIH[i * 2 + 1] % nProcessors != pId) {
+      ++count;
+    }
+    bsp_get( (matrixIndecesIH[i * 2 + 1] % nProcessors), hidden + matrixIndecesIH[i * 2 + 1] / nProcessors, 0, localStore + count, SIZET);
+  }
+
+  //local matrix-vector multiplication
+  for (uint32_t i = 0; i < countElements; ++i) {
+    partialResults[i] = 0;
+    for (uint32_t i = 0; i < )
+  }
+
+
   //calculate output from hidden layer
   //----------------------------------------------------------------------------
   for (uint32_t i = 0; i < hiddenNeurons; ++i) {

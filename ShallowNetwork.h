@@ -12,13 +12,22 @@ class ShallowNetwork {
   //----------------------------------------------------------------------------
 private:
 
-  //Number of processors
+  //processor ID
+  uint32_t pId;
+
+  //Number of processors rows
+  uint32_t processorsRows;
+
+  //Number of processorsCols
+  uint32_t processorsCols;
+
+  //Total number of processors
   uint32_t nProcessors;
 
   //Number of neurons in each layer
   uint32_t inputNeurons, hiddenNeurons, outputNeurons;
 
-  //number of local neurons in each processor
+  //number of local neurons in the processor
   uint32_t localInputNeurons, localHiddenNeurons, localOutputNeurons;
 
   //Neurons layers as vectors
@@ -29,6 +38,15 @@ private:
 
   //Weight matrices within layers
   double * weightInputHidden, weightHiddenOutput;
+
+  //store the indeces of the matrix elements contained in the processor
+  uint32_t * matrixIndecesIH;
+
+  //count matrix elements on the processor
+  uint32_t countElements;
+
+  //store vector elements received during computation
+  double * localStore;
 
   //Public Methods
   //----------------------------------------------------------------------------

@@ -26,6 +26,10 @@ double * IsingDataLoader::getDataSet() {
   return set;
 }
 
+double * IsingDataLoader::getLabels() {
+  return label;
+}
+
 //Read data from one file and initialize one elemnt of set, i.e. it initializes
 //two vectors, one with the input configuration and one with the corresponding ouput label.
 void IsingDataLoader::setData(std::string & fileName, uint32_t fileNumber) {
@@ -72,6 +76,7 @@ bool IsingDataLoader::loadData(uint32_t numberOfFiles, const char * listFile) {
   //read data files names from file
   std::ifstream myfile (listFile);
   std::string fileName;
+
   if (myfile.is_open()) {
     for(uint32_t i = 0; i < numberOfFiles; ++i) {
       if (std::getline(myfile, fileName)) {

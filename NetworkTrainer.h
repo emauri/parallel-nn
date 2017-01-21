@@ -1,8 +1,7 @@
 //Header for the NetworkTrainer class
 #ifndef NETWORKTRAINER_H
 #define NETWORKTRAINER_H
-
-#include<armadillo>
+#include <vector>
 
 #include "ShallowNetwork.h"
 
@@ -15,10 +14,12 @@ private:
   ShallowNetwork * network;
 
   //vectors storing changes in biases during gradient descent
-  arma::fvec deltaHiddenBias, deltaOutputBias;
+  float * deltaHiddenBias;
+  float * deltaOutputBias;
 
   //matrices storing cahnges in weights during gradient descent
-  arma::fmat deltaWeightInputHidden, deltaWeightHiddenOutput;
+  float * deltaWeightInputHidden;
+  float * deltaWeightHiddenOutput;
 
   //learning parameters
   float learningRate;
@@ -32,41 +33,47 @@ private:
   //monitor progress during learning
   float incorrectResults = 0;
 
-  arma::fvec trainingAccuracy;
-  arma::fvec validationAccuracy;
-  arma::fvec validationCost;
+  float * trainingAccuracy;
+  float * validationAccuracy;
+  float * validationCost;
 
   //store shuffled indeces to access data in random order
-  arma::Col<uint32_t> shuffleData;
+  std::vector<uint32_t> shuffleData;
+
+  //number of training samples
+  uint32_t trainingSize;
+
+  //store variables from other processors during backpropagation
+  float * localStore;
 
   //public Methods
   //----------------------------------------------------------------------------
 public:
 
   //constructor with default values
-  NetworkTrainer(ShallowNetwork * network, float learningRate = 0.01, uint32_t numberOfEpochs = 30, uint32_t miniBatchSize = 10, float regularizer = 0.0, bool useValidation = false);
+  NetworkTrainer(ShallowNetwork * network, float learningRate = 0.01, uint32_t numberOfEpochs = 30, uint32_t miniBatchSize = 10, float regularizer = 0.0, bool useValidation = false, uint32_t trainingSize = 33000);
 
   //setters
   void setTrainingParameters(float learningRate, uint32_t numberOfEpochs, uint32_t batchSize, float regularizer = 0.0, bool useValidation = false);
 
   //getters for monitorig vector
-  arma::fvec getTrainingAccuracy() const;
-  arma::fvec getValidationAccuracy() const;
-  arma::fvec getValidationCost() const;
+  float * getTrainingAccuracy() const;
+  float * getValidationAccuracy() const;
+  float * getValidationCost() const;
 
   //network trainer
-  void trainNetwork(arma::field< arma::field<arma::fvec> > * trainingSet, arma::field< arma::field<arma::fvec> > * validationSet = NULL);
+  void trainNetwork(float * trainingSet, float * labels, float * validationSet = NULL);
 
   //private Methods
   //----------------------------------------------------------------------------
 private:
 
-  arma::fvec getOutputError(arma::fvec & output, arma::fvec & label);
-  void stochasticGradientDescent(arma::field< arma::field<arma::fvec> > * trainingSet, uint32_t size);
-  void updateNetwork(arma::field< arma::field<arma::fvec> > * trainingSet, uint32_t currentBatchStart, uint32_t size);
-  void backpropagation(arma::fvec & input, arma::fvec & label);
-  float crossEntropy(arma::fvec & output, arma::fvec & label);
-  float monitorCost(arma::field< arma::field<arma::fvec> > * set);
+  void stochasticGradientDescent(float * trainingSet, float * labels, uint32_t size);
+  void updateNetwork(float * trainingSet, float * labels, uint32_t currentBatchStart, uint32_t size);
+  void backpropagation(float * input, float label);
+  float crossEntropy(float * output, float label);
+  //float monitorCost(float * set, float * labels);
+  void resetWeightsAndBiases();
 };
 
 #endif

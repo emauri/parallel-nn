@@ -25,19 +25,20 @@ private:
   uint32_t inputNeurons, hiddenNeurons, outputNeurons;
 
   //number of local neurons in the processor
-  uint32_t localInputNeurons, localHiddenNeurons, localOutputNeurons;
+  uint32_t localInputNeurons, localHiddenNeurons;
 
   //Neurons layers as vectors
-  double * hidden;
-  double * output;
+  float * input;
+  float * hidden;
+  float * output;
 
   //Neurons biases stored as vectors for each layer
-  double * hiddenBias;
-  double * outputBias;
+  float * hiddenBias;
+  float * outputBias;
 
   //Weight matrices within layers
-  double * weightInputHidden;
-  double * weightHiddenOutput;
+  float * weightInputHidden;
+  float * weightHiddenOutput;
 
   //store the indeces of the matrix elements contained in the processor
   uint32_t * matrixIndecesIH;
@@ -46,13 +47,13 @@ private:
   uint32_t countI, countJ, countElements;
 
   //store vector elements received during matix-vector multiplication
-  double * localStore;
+  float * localStore;
 
   //store results of the matrix vector multiplication
-  double * partialResults;
-  double * allResults;
-  double * partialResultsOutput;
-  double * allResultsOutput;
+  float * partialResults;
+  float * allResults;
+  float * partialResultsOutput;
+  float * allResultsOutput;
 
   //Public Methods
   //----------------------------------------------------------------------------
@@ -80,10 +81,10 @@ public:
   //bool loadNetwork(const char * directoryName = ".");
 
   //get the result of the network evaluation;
-  uint32_t getResult(double * input);
+  uint32_t getResult(float * input);
 
   //training evaluation
-  //float getAccuracyOfSet(double * set);
+  //float getAccuracyOfSet(float * set);
 
   //Friends
 	//--------------------------------------------------------------------------------------------
@@ -94,8 +95,8 @@ public:
 private:
 
   void initializeWeightsAndBiases();
-  void activationFunction(double & input);
-  void feedForward(double * input);
+  void activationFunction(float & input);
+  void feedForward(float * input);
 };
 
 #endif

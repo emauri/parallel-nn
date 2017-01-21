@@ -10,8 +10,8 @@
 
 //constructor
 IsingDataLoader::IsingDataLoader(uint32_t numberOfFiles, uint32_t latticeSize) : numberOfFiles(numberOfFiles), latticeSize(latticeSize) {
-  set = new double[numberOfFiles * latticeSize];
-  label = new double[numberOfFiles];
+  set = new float[numberOfFiles * latticeSize];
+  label = new float[numberOfFiles];
 }
 
 //destructor
@@ -22,11 +22,11 @@ IsingDataLoader::~IsingDataLoader() {
 }
 
 //Getter
-double * IsingDataLoader::getDataSet() {
+float * IsingDataLoader::getDataSet() {
   return set;
 }
 
-double * IsingDataLoader::getLabels() {
+float * IsingDataLoader::getLabels() {
   return label;
 }
 
@@ -52,7 +52,7 @@ void IsingDataLoader::setData(std::string & fileName, uint32_t fileNumber) {
       label[fileNumber] = (std::stod(line) < 2.269) ? 0 : 1;
     }
     else {
-      std::cout << "Something is wrong, the data are not being loaded" << std::endl;
+      std::cout << "Something is wrong, the data are not being loaded." << std::endl;
     }
 
     //Set the input configuration
@@ -62,7 +62,7 @@ void IsingDataLoader::setData(std::string & fileName, uint32_t fileNumber) {
         set[fileNumber * latticeSize + i] = std::stod(line);
       }
       else {
-        std::cout << "Something is wrong, the data are not being loaded" << std::endl;
+        std::cout << "Something is wrong, the data are not being loaded." << std::endl;
       }
     }
   }

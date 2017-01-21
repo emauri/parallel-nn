@@ -7,7 +7,7 @@
 extern "C" {
   #include "mcbsp-affinity.h"
 }
-#define SIZET (sizeof(double))
+#define SIZET (sizeof(float))
 
 class IsingDataLoader {
 
@@ -18,10 +18,10 @@ private:
   uint32_t numberOfFiles;
   uint32_t latticeSize;
   //store all the configurations contiguosly
-  double * set;
+  float * set;
 
   //store all the labels
-  double * label;
+  float * label;
 
   //Public methods
   //----------------------------------------------------------------------------
@@ -40,7 +40,9 @@ public:
   bool loadData(const char * fileName);
 
   //Getter for the data set. Return a pointer to the loaded dat set
-  double * getDataSet();
+  float * getDataSet();
+
+  float * getLabels();
 
   //Private methods
   //----------------------------------------------------------------------------

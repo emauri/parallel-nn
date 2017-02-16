@@ -46,8 +46,8 @@ void IsingDataLoader::setData(std::string & fileName, uint32_t fileNumber) {
 
     //Set the output label
     //----------------------------------------------------------------------------
-    //If the temperature is less than 2.269 it is below the critical temperature: label = 0,
-    //otherwise it is above: label = 1
+    //If the temperature is less than 2.269 the system is below the critical temperature:
+    //label = 0, otherwise it is above: label = 1
     if ( std::getline(file, line) ) {
       label[fileNumber] = (std::stod(line) < 2.269) ? 0 : 1;
     }

@@ -72,7 +72,7 @@ private:
   void updateNetwork(float * trainingSet, float * labels, uint32_t currentBatchStart, uint32_t size);
   void backpropagation(float * input, float label);
   float crossEntropy(float * output, float label);
-  //float monitorCost(float * set, float * labels);
+  //float monitorCost(float * set, float * labels); (yet to be implemented in this parallel version)
   void resetWeightsAndBiases();
 };
 

@@ -65,17 +65,6 @@ public:
   //destructor
   ~ShallowNetwork();
 
-  //getters and setters
-  //arma::Col<uint32_t> getStructure() const;
-
-  //As of now, I am not going to allow setters, initialize the network with the right values using the constructor.
-  /*
-  void setInputNeurons(uint32_t inputNeurons);
-  void setHiddenNeurons(uint32_t hiddenNeurons);
-  void setOutputNeurons(uint32_t outputNeurons);
-  void setStructure(arma::Col<uint32_t> & structure);
-*/
-
   //save to and load a network form the given directory. If used with no arguments it saves to and load from the same directory as the file.
   //bool saveNetwork(const char * directoryName = ".");
   //bool loadNetwork(const char * directoryName = ".");

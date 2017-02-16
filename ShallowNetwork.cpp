@@ -65,14 +65,14 @@ ShallowNetwork::ShallowNetwork(uint32_t pId, uint32_t pR, uint32_t pC, uint32_t 
 //destructor
 ShallowNetwork::~ShallowNetwork()
 {
-	//delete neurons
-	delete[] hidden;
-	delete[] output;
+  //delete neurons
+  delete[] hidden;
+  delete[] output;
 
   //delete weight and biases
   delete[] weightInputHidden;
   delete[] weightHiddenOutput;
-	delete[] hiddenBias;
+  delete[] hiddenBias;
   delete[] outputBias;
 
   //delete storing arrays
@@ -85,7 +85,7 @@ ShallowNetwork::~ShallowNetwork()
 }
 
 
-//biases initializer
+//weight and biases initializer
 void ShallowNetwork::initializeWeightsAndBiases() {
 
   //set the seed to a random value
@@ -122,7 +122,7 @@ void ShallowNetwork::initializeWeightsAndBiases() {
   //initialize matrixIndeces
   for(uint32_t i = 0; i < hiddenNeurons; ++i) {
     for (uint32_t j = 0; j < inputNeurons; ++j) {
-      if ( ( (i % processorsCols) + processorsRows * ((j % nProcessors) / processorsRows) ) == pId ) {
+      if ( ( (i % processorsRows) + processorsRows * ((j % nProcessors) / processorsRows) ) == pId ) {
         matrixIndecesIH[countElements * 2] = i;
         matrixIndecesIH[countElements * 2 + 1] = j;
         ++countElements;
@@ -248,12 +248,12 @@ void ShallowNetwork::activationFunction(float & input) {
 }
 
 //Feed Forward procedure
-void ShallowNetwork::feedForward(float * tinput) {
+void ShallowNetwork::feedForward(float * input) {
 
   //calculate output from hidden layer
   //----------------------------------------------------------------------------
   for (uint32_t i = 0; i < localInputNeurons; ++i) {
-    input[i] = tinput[i];
+    this->input[i] = input[i];
   }
   //Superstep 0: Fanout
   uint32_t count = 0;
@@ -262,7 +262,7 @@ void ShallowNetwork::feedForward(float * tinput) {
       ++count;
       assert(count < (inputNeurons - localInputNeurons) );
       assert((matrixIndecesIH[i * 2 + 1] / nProcessors) < localInputNeurons * 5000);
-      bsp_get( (matrixIndecesIH[i * 2 + 1] % nProcessors), input, (matrixIndecesIH[i * 2 + 1] / nProcessors) * SIZET, (localStore + count), SIZET);
+      bsp_get( (matrixIndecesIH[i * 2 + 1] % nProcessors), this->input, (matrixIndecesIH[i * 2 + 1] / nProcessors) * SIZET, (localStore + count), SIZET);
 
     }
   } //localStore stores the vector elements not owned by the processors in increasing index order

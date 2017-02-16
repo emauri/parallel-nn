@@ -51,15 +51,18 @@ void parallelNN() {
 
   //load data and distribute them cyclically
   //----------------------------------------------------------------------------
-  if ( !training.loadData(setSize, "../Final Project/dataList/trainingData.txt") ) { return; };
+  char fileName[100];
+  char filePath[100];
+  sprintf(filePath, "../Final Project/dataParallel/trainingParallel");
+  char fileNumber[10];
+  sprintf(fileNumber, "_%02d.txt", pId);
+  strcpy(fileName, filePath);
+  strcat(fileName, fileNumber);
+  if ( !training.loadData(setSize, fileName) ) { return; };
 
   float * set = training.getDataSet();
 
   float * labels = training.getLabels();
-
-  bsp_push_reg(set, inputNeurons * setSize * SIZET);
-  bsp_push_reg(labels, SIZET * setSize);
-  bsp_sync();
 
   //distribute the input vector cyclically on each processor
 
@@ -71,9 +74,6 @@ void parallelNN() {
     }
   }
 
-  bsp_sync();
-
-  bsp_pop_reg(set);
   delete[] set;
   //network declaration;
   ShallowNetwork network(pId, M, N, inputNeurons, hiddenNeurons, outputNeurons);

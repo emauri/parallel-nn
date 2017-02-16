@@ -167,7 +167,7 @@ void NetworkTrainer::updateNetwork(float * trainingSet, float * labels, uint32_t
 
   for (uint32_t i = currentBatchStart; i < stop; ++i) {
     //backpropagation
-    backpropagation(trainingSet + shuffleData[i] * network->localInputNeurons,  labels[shuffleData[i]]);
+    backpropagation(trainingSet + i * network->localInputNeurons,  labels[i]);
 
     //find the index of the neuron with the highest output value
     uint32_t indexMax = 0;

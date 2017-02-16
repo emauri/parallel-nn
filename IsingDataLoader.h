@@ -1,4 +1,4 @@
-//Header for a simple IsingDataLoader class, to be improved later
+//Header for the IsingDataLoader class (to be improved later)
 #ifndef ISINGDATALOADER_H
 #define ISINGDATALOADER_H
 #include<vector>
